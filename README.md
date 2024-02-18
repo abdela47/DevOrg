@@ -4,7 +4,7 @@
 
 ### Frontend Web app: React.js
 
-## Frontend Mobile app: React-native
+### Frontend Mobile app: React-native
 
 ### Backend: Python FastAPI / Django / Express.js
 
