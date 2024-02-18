@@ -2,7 +2,9 @@
 
 ## Tentative Tech Stack
 
-### Frontend: React.js
+### Frontend Web app: React.js
+
+## Frontend Mobile app: React-native
 
 ### Backend: Python FastAPI / Django / Express.js
 
