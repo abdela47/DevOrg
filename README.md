@@ -8,4 +8,4 @@
 
 ### Backend: Express.js / Python FastAPI / Django / 
 
-### Database: Postgresql / MongoDB Atlas / MySQL 
+### Database: Firebase / Postgresql /MongoDB Atlas / MySQL / Neo4j 
