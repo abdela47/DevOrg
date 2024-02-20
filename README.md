@@ -6,6 +6,6 @@
 
 ### Frontend Mobile app: React-native
 
-### Backend: Python FastAPI / Django / Express.js
+### Backend: Express.js / Python FastAPI / Django / 
 
 ### Database: Postgresql / MongoDB Atlas / MySQL 
