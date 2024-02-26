@@ -1,6 +1,6 @@
-# Membership Web App
+# Musfit Web App
 
-## Tentative Tech Stack
+## Permanent, unchangeable Tech Stack
 
 ### Frontend Web app: React.js
 
