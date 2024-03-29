@@ -1,6 +1,6 @@
 # Generic imports
 import datetime
-from typing import Optional
+from typing import Optional, Union
 import re
 
 # FireBase Stuff
@@ -50,6 +50,7 @@ class User:
         keys = set(data.keys())
 
         if not keys.issuperset(mandatory_keys):
+            print('missing keys')
             # TODO: Missing info case. figure out error handling for missing info.
             pass
         else:
@@ -118,7 +119,7 @@ Optional[bool]) -> bool:
     users = db.collection("Users").stream()
     for user in users:
         if user.id == user_id:
-            # TODO: Raise some kind of safe error
+            # TODO: Person exists, Raise some kind of safe error
             return False
         print(f'{user.id} => {user.to_dict()}')
 
@@ -136,6 +137,24 @@ Optional[bool]) -> bool:
     # TODO: add user to DB
     db.collection("Users").document(new_user_info[0]).set(new_user_info[1])
     return True
+
+
+def fetch(user_id: str) -> Union[User, bool]:
+    """
+    Fetch a file from the DB with a given user_id
+    :param user_id: duh
+    :return: either a User object, or False
+    """
+    # users = db.collection("Users").stream()
+    doc_ref = db.collection("Users").document(user_id)
+    doc = doc_ref.get()
+    if doc.exists:
+        print(doc.to_dict())
+        user = User.from_dict(doc.to_dict())
+        return user
+    else:
+        print('DNE')
+        return False
 
 
 create_profile('Abdelrahman', 'Alkhawas', 'abderlahmna_khawas@hotmail.com', '04-10-2001', 'Male', False)
