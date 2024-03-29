@@ -33,17 +33,18 @@ class User:
     @staticmethod
     def from_dict(data: dict):
         """
-        Given a dictionary, construct an instance of this User class
+        Given a dictionary, construct an instance of this User class. Purpose of this function is purely for dealing
+          with confirmed existing entries => existence authentication is not necessary. Purely for fetching from DB
         :param data: a dictionary with unknown keys. there are certain mandatory keys whose presence must be checked.
         everything after that is nunez
         :return: a User instance.
         """
 
-        # TODO: Bunch of asserts that the required dict keys exist.
-        # TODO: Figure out whether userId construction occurs here or whether its a necessary key
+        # Bunch of asserts that the required dict keys exist.
+        # Done: Figure out whether userId construction occurs here or whether its a necessary key. not necessary
         # TODO: Figure out the potential keys.
 
-        mandatory_keys = ['userId', 'first_name', 'last_name', 'email', 'birthdate', 'gender']
+        mandatory_keys = ['user_id', 'first_name', 'last_name', 'email', 'birthdate', 'gender']
         all_keys = ['userId', 'first_name', 'last_name', 'email', 'birthdate', 'gender', 'free_pass_used',
                     'token_profile', 'history', 'scheduled', 'memberships', 'settings']
         values = []
@@ -79,6 +80,7 @@ class User:
             "settings": self.settings
         }]
 
+
 def hash_name(first: str, last: str) -> str:
     """
     returns a hash of the full name to return a unique userId
@@ -96,14 +98,13 @@ def valid_email(email: str) -> bool:
     regex = re.compile(r'([A-Za-z0-9]+[.-_])*[A-Za-z0-9]+@[A-Za-z0-9-]+(\.[A-Z|a-z]{2,})+')
     return bool(re.fullmatch(regex, email))
 
-# Make API Here
 
-def create_profile(first_name: str, last_name: str, email: str, birth: str, gender: str, member:
-Optional[bool]) -> bool:
+def create_profile(first_name: str, last_name: str, email: str, birth: str, gender: str, member: Optional[bool]) -> bool:
     """
     A function that creates a new profile then adds it to the database
     :param first_name: self-explanatory
     :param last_name: self-explanatory
+    :param email: self-explanatory
     :param birth: Birthdate. Used to determine age as well. Must be structured 'DD-MM-YYYY'
     :param gender: UI should restrict options to either Male or Female.
     :param member: Optional Bool representing whether the new user has come in with a member ship.
@@ -115,7 +116,7 @@ Optional[bool]) -> bool:
     if not valid_email(email):
         return False
 
-    # TODO: ensure person doesnt already exist in the database
+    # ensure person doesn't already exist in the database
     users = db.collection("Users").stream()
     for user in users:
         if user.id == user_id:
@@ -130,12 +131,14 @@ Optional[bool]) -> bool:
 
     assert gender in ['Male', 'Female']
 
-    # TODO: create User
+    # create User
     new_user = User(user_id, first_name, last_name, email, birth_dt, gender, memberships=[member])
     new_user_info = new_user.to_dict()
     print(new_user.to_dict())
-    # TODO: add user to DB
+    # add user to DB
     db.collection("Users").document(new_user_info[0]).set(new_user_info[1])
+
+    # TODO: figure out history management.
     return True
 
 
@@ -150,13 +153,30 @@ def fetch(user_id: str) -> Union[User, bool]:
     doc = doc_ref.get()
     if doc.exists:
         print(doc.to_dict())
-        user = User.from_dict(doc.to_dict())
+        fetched = doc.to_dict()
+        fetched['user_id'] = user_id
+        user = User.from_dict(fetched)
         return user
     else:
         print('DNE')
         return False
 
 
-create_profile('Abdelrahman', 'Alkhawas', 'abderlahmna_khawas@hotmail.com', '04-10-2001', 'Male', False)
+def delete_user(user_id: str) -> datetime:
+    """
+    delete an entire user based on user_id
+    :param user_id:  duh
+    :return: timestamp of deletion if successful.
+    """
+    if db.collection("Users").document(user_id).get().exists:
+        # TODO: figure out history management.
+        return db.collection("Users").document(user_id).delete()
+
+
+def edit_user(user_id: str, field: str) -> datetime:
+    pass
+
+
+create_profile('Abdelrahman', 'Alkhawas', 'abderlahman_khawas@hotmail.com', '04-10-2001', 'Male', False)
 create_profile('Ahmed', 'Abdelaziz', 'ahmed.ym.tawfik@gmail.com', '19-07-2002', 'Male', False)
 create_profile('Omar', 'Zeid', 'omar.kmaz@gmail.com', '21-09-2000', 'Male', False)
