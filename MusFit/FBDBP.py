@@ -268,11 +268,20 @@ def delete_event(event_id) -> datetime:
     :param event_id:
     :return:
     """
-    pass
+    if db.collection("Events").document(event_id).get().exists:
+        # TODO: figure out history management. Logging document somewhere
+        return db.collection("Events").document(event_id).delete()
 
 
 def edit_user(user_id: str, field: str) -> datetime:
     # TODO: Actually do it.
+    all_keys = ['userId', 'first_name', 'last_name', 'email', 'birthdate', 'gender', 'free_pass_used',
+                'token_profile', 'history', 'scheduled', 'memberships', 'settings']
+
+    assert field in all_keys
+    user = fetch_user(user_id)
+    doc_ref = db.collection("Users").document(user_id)
+    doc = doc_ref.get()
     pass
 
 
