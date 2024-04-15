@@ -6,7 +6,7 @@
 
 ### Frontend Mobile app: React-native
 
-### Backend: Express.js
+### Backend: Express.js (SIKE: Python)
 
 ### Database: Firebase
 
