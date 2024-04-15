@@ -15,7 +15,8 @@ db = firestore.client()
 
 
 class SingularEvent:
-    def __init__(self, event_id, event_name, gender, sport, start_date_time, duration, capacity, enrolled=None, tags=None):
+    def __init__(self, event_id, event_name, gender, sport, start_date_time, duration, capacity, enrolled=None,
+                 tags=None, pending=None, waitlist=None):
         self.event_id = event_id
         self.event_name = event_name
         self.gender = gender
@@ -24,6 +25,8 @@ class SingularEvent:
         self.duration = duration
         self.capacity = capacity
         self.enrolled = enrolled if enrolled is not None else []
+        self.pending = pending if pending is not None else []
+        self.waitlist = waitlist if waitlist is not None else []
         self.tags = tags if tags is not None else []
 
     @staticmethod
@@ -34,7 +37,8 @@ class SingularEvent:
         :param data: a dictionary wth all key filled in. All keys are mandatory
         :return: an Event Instance.
         """
-        values, keys = [], ["event_id", "gender", "sport", "start_date_time", "duration", "capacity", "enrolled", "tags"]
+        values, keys = [], ["event_id", "gender", "sport", "start_date_time", "duration", "capacity", "enrolled",
+                            "tags", "pending", "waitlist"]
 
         for key in keys:
             values.append(data.get(key, None))
@@ -54,7 +58,9 @@ class SingularEvent:
                  "duration": self.duration,
                  "capacity": self.capacity,
                  "enrolled": self.enrolled,
-                 "tags": self.tags}]
+                 "tags": self.tags,
+                 "pending": self.pending,
+                 "waitlist": self.waitlist}]
 
     def enroll_user(self, user_id) -> datetime:
         """
@@ -169,7 +175,7 @@ def valid_email(email: str) -> bool:
     return bool(re.fullmatch(regex, email))
 
 
-def create_singular_event(event_name: str, gender: str, sport: str, start_datetime: str, duration: int, tags: Optional[list]):
+def create_singular_event(event_name: str, gender: str, sport: str, start_datetime: str, duration: int, capacity: int, tags: Optional[list]):
     """
     A function that creates a new event then adds it to the DB
     :param event_name: Name to be displayed on front-end
@@ -181,22 +187,25 @@ def create_singular_event(event_name: str, gender: str, sport: str, start_dateti
     :return: SingularEvent object
     """
 
-    # TODO: hash event and get event name
     event_datetime = datetime.datetime(*[int(num) for num in start_datetime.split('-')])
     event_id = hash_event_instance(sport, gender, event_datetime)
-    # TODO: check for existence of event.
+
     events = db.collection("Events").stream()
     for event in events:
         if event.id == event_id:
             # TODO: Event exists, Raise some kind of safe error
             return None
-    # TODO: create event object
+
     if sport not in tags: tags.append(sport)
     if gender not in tags: tags.append(gender)
     if 'non-recurring' not in tags: tags.append('non-recurring')
 
-    new_event = SingularEvent(event_id, event_name, gender, sport, start_datetime, duration, tags)
-    # TODO: add event object to database
+    new_event = SingularEvent(event_id, event_name, gender, sport, start_datetime, duration, capacity, None,
+                              tags, None, None)
+    new_event_info = new_event.to_dict()
+
+    db.collection("Events").document(new_event_info[0]).set(new_event_info[1])
+    return new_event
 
 
 def create_profile(first_name: str, last_name: str, email: str, birth: str, gender: str,
@@ -269,7 +278,6 @@ def fetch_event(event_id: str) -> Optional[SingularEvent]:
     :param event_id: duh
     :return: either an Event object, or None
     """
-    # users = db.collection("Users").stream()
     doc_ref = db.collection("Events").document(event_id)
     doc = doc_ref.get()
     if doc.exists:
@@ -313,6 +321,11 @@ def edit_user(user_id: str, field: str, new_value) -> datetime:
     user = fetch_user(user_id)
     doc_ref = db.collection("Users").document(user_id)
     doc_ref.update({field: new_value})
+
+
+def edit_event(event_id: str, field: str, new_value) -> datetime:
+    # TODO: Actually Do it
+    pass
 
 
 create_profile('Abdelrahman', 'Alkhawas', 'abderlahman_khawas@hotmail.com', '04-10-2001', 'Male', False)
