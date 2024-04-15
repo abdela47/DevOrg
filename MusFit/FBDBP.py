@@ -14,14 +14,15 @@ app = firebase_admin.initialize_app(cred)
 db = firestore.client()
 
 
-class Event:
-    def __init__(self, event_id, event_name, gender, sport, start_time, duration, capacity, enrolled=None, tags=None):
+class SingularEvent:
+    def __init__(self, event_id, event_name, gender, sport, start_date_time, duration, capacity, enrolled=None, tags=None):
         self.event_id = event_id
         self.event_name = event_name
         self.gender = gender
         self.sport = sport
-        self.start_time = start_time
+        self.start_time = start_date_time
         self.duration = duration
+        self.capacity = capacity
         self.enrolled = enrolled if enrolled is not None else []
         self.tags = tags if tags is not None else []
 
@@ -33,12 +34,12 @@ class Event:
         :param data: a dictionary wth all key filled in. All keys are mandatory
         :return: an Event Instance.
         """
-        values, keys = [], ["event_id", "gender", "sport", "start_time", "duration", "enrolled", "tags"]
+        values, keys = [], ["event_id", "gender", "sport", "start_date_time", "duration", "capacity", "enrolled", "tags"]
 
         for key in keys:
             values.append(data.get(key, None))
 
-        return Event(*values)
+        return SingularEvent(*values)
 
     def to_dict(self) -> list[str, dict]:
         """
@@ -141,7 +142,21 @@ def hash_name(first: str, last: str) -> str:
 
     # return first three letters of each name followed by length of each name. ***for now***
     # e.g has_name(Abdelrahman, Alkhawas) -> Abd11Alk8
+    temp = str(hash(f'{first} {last}'))[-3:]
+    # TODO: figure out hash function.
     return f'{first[:3]}{len(first)}{last[:3]}{len(last)}'
+
+
+def hash_event_instance(sport: str, gender: str, event_datetime: datetime) -> str:
+    """
+    A function to hash a particular instance of an event.
+    :param sport: self
+    :param gender: self
+    :param event_datetime: datetime of this particular instance.
+    :return: unique hashed string
+    """
+    assert gender.lower() in ['male', 'female']
+    return f'{gender[0]}{str(hash(event_datetime))[-3:]}{sport[:3]}'
 
 
 def valid_email(email: str) -> bool:
@@ -154,21 +169,38 @@ def valid_email(email: str) -> bool:
     return bool(re.fullmatch(regex, email))
 
 
-def create_event(event_name: str, gender: str, sport: str, start_time: str, duration: int, tags: Optional[list]):
+def create_singular_event(event_name: str, gender: str, sport: str, start_datetime: str, duration: int, tags: Optional[list]):
     """
     A function that creates a new event then adds it to the DB
-    :param event_name:
-    :param gender:
-    :param sport:
-    :param start_time:
-    :param duration:
-    :param tags:
-    :return:
+    :param event_name: Name to be displayed on front-end
+    :param gender: self
+    :param sport: self
+    :param start_time: datetime string of this particular instance YYYY-MM-DD-HH-MM.
+    :param duration: in minutes
+    :param tags: for searching
+    :return: SingularEvent object
     """
+
+    # TODO: hash event and get event name
+    event_datetime = datetime.datetime(*[int(num) for num in start_datetime.split('-')])
+    event_id = hash_event_instance(sport, gender, event_datetime)
+    # TODO: check for existence of event.
+    events = db.collection("Events").stream()
+    for event in events:
+        if event.id == event_id:
+            # TODO: Event exists, Raise some kind of safe error
+            return None
+    # TODO: create event object
+    if sport not in tags: tags.append(sport)
+    if gender not in tags: tags.append(gender)
+    if 'non-recurring' not in tags: tags.append('non-recurring')
+
+    new_event = SingularEvent(event_id, event_name, gender, sport, start_datetime, duration, tags)
+    # TODO: add event object to database
 
 
 def create_profile(first_name: str, last_name: str, email: str, birth: str, gender: str,
-                   member: Optional[bool]) -> bool:
+                   member: Optional[bool]) -> Optional[User]:
     """
     A function that creates a new profile then adds it to the database
     :param first_name: self-explanatory
@@ -188,7 +220,7 @@ def create_profile(first_name: str, last_name: str, email: str, birth: str, gend
     # ensure person doesn't already exist in the database
     users = db.collection("Users").stream()
     for user in users:
-        if user.id == user_id:
+        if user.id == user_id:  # Turns out we actually want to compare their emails. overlapping names.
             # TODO: Person exists, Raise some kind of safe error
             return False
         print(f'{user.id} => {user.to_dict()}')
@@ -208,7 +240,7 @@ def create_profile(first_name: str, last_name: str, email: str, birth: str, gend
     db.collection("Users").document(new_user_info[0]).set(new_user_info[1])
 
     # TODO: figure out history management.
-    return True
+    return new_user
 
 
 def fetch_user(user_id: str) -> Union[User, bool]:
@@ -231,7 +263,7 @@ def fetch_user(user_id: str) -> Union[User, bool]:
         return False
 
 
-def fetch_event(event_id: str) -> Optional[Event]:
+def fetch_event(event_id: str) -> Optional[SingularEvent]:
     """
     Fetch a file from the DB with a given event_id
     :param event_id: duh
@@ -244,7 +276,7 @@ def fetch_event(event_id: str) -> Optional[Event]:
         print(doc.to_dict())
         fetched = doc.to_dict()
         fetched['event_id'] = event_id
-        event = Event.from_dict(fetched)
+        event = SingularEvent.from_dict(fetched)
         return event
     else:
         print('DNE')
@@ -273,26 +305,17 @@ def delete_event(event_id) -> datetime:
         return db.collection("Events").document(event_id).delete()
 
 
-def edit_user(user_id: str, field: str) -> datetime:
+def edit_user(user_id: str, field: str, new_value) -> datetime:
     # TODO: Actually do it.
-    all_keys = ['userId', 'first_name', 'last_name', 'email', 'birthdate', 'gender', 'free_pass_used',
-                'token_profile', 'history', 'scheduled', 'memberships', 'settings']
+    all_keys = ['email', 'free_pass_used', 'token_profile', 'history', 'scheduled', 'memberships', 'settings']
 
     assert field in all_keys
     user = fetch_user(user_id)
     doc_ref = db.collection("Users").document(user_id)
-    doc = doc_ref.get()
-    pass
+    doc_ref.update({field: new_value})
 
 
 create_profile('Abdelrahman', 'Alkhawas', 'abderlahman_khawas@hotmail.com', '04-10-2001', 'Male', False)
 create_profile('Ahmed', 'Abdelaziz', 'ahmed.ym.tawfik@gmail.com', '19-07-2002', 'Male', False)
 create_profile('Omar', 'Zeid', 'omar.kmaz@gmail.com', '21-09-2000', 'Male', False)
-temp_event = Event('f2r34q', 'mens football', 'Male', 'football', datetime.datetime(2024, 4, 5, 21, 0, 0), 55)
-
-def hash_event(event_name: str) -> str:
-    """
-    returns a hash of the event name with a unique event_id
-    :param event_name:
-    :return:
-    """
+temp_event = SingularEvent('f2r34q', 'mens football', 'Male', 'football', datetime.datetime(2024, 4, 5, 21, 0, 0), 55, 21)
