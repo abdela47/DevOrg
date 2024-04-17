@@ -69,6 +69,11 @@ class SingularEvent:
         :return:
         """
         # TODO: BIG TODO
+
+        # TODO: Get user info
+        # TODO: Membership Logic (Make membership class, put token profile as class attribute)
+        # TODO: Check Token Availibility
+
         pass
 
 
@@ -175,7 +180,8 @@ def valid_email(email: str) -> bool:
     return bool(re.fullmatch(regex, email))
 
 
-def create_singular_event(event_name: str, gender: str, sport: str, start_datetime: str, duration: int, capacity: int, tags: Optional[list]):
+def create_singular_event(event_name: str, gender: str, sport: str, start_datetime: str, duration: int, capacity: int,
+                          tags: Optional[list]):
     """
     A function that creates a new event then adds it to the DB
     :param event_name: Name to be displayed on front-end
