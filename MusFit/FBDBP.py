@@ -13,6 +13,25 @@ cred = credentials.Certificate('fbdbpractice-firebase-adminsdk-teuw8-4dcece3d0f.
 app = firebase_admin.initialize_app(cred)
 db = firestore.client()
 
+# indicies for token profiles: [Football, BasketBall, ]
+
+
+class Membership:
+    def __init__(self, mem_name, token_profile, period, period_price):
+        """
+        Initiation Function
+        :param mem_name: DisplayName of membership
+        :param token_profile: Important Part
+        :param period: One of either Weekly, Monthly, Quarterly, Yearly
+        :param period_price:  Price to be delivered per period.
+        """
+        self.name = mem_name
+        self.profile = token_profile
+        self.period = period
+        self.price = period_price
+
+
+# def create_membership( )
 
 class SingularEvent:
     def __init__(self, event_id, event_name, gender, sport, start_date_time, duration, capacity, enrolled=None,
@@ -64,14 +83,17 @@ class SingularEvent:
 
     def enroll_user(self, user_id) -> datetime:
         """
-        Logic for enrolling user. Figure out Queues, waitlists, capacities, buffer times...
+        Logic for enrolling user into a one time event. Figure out Queues, waitlists, capacities, buffer times...
         :param user_id:
         :return:
         """
         # TODO: BIG TODO
 
         # TODO: Get user info
+        user = fetch_user(user_id)
+
         # TODO: Membership Logic (Make membership class, put token profile as class attribute)
+
         # TODO: Check Token Availibility
 
         pass
