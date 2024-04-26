@@ -25,13 +25,21 @@ class Membership:
         :param period: One of either Weekly, Monthly, Quarterly, Yearly
         :param period_price:  Price to be delivered per period.
         """
-        self.name = mem_name
-        self.profile = token_profile
+        self.name: str = mem_name
+        self.profile: dict = token_profile
         self.period = period
-        self.price = period_price
+        self.price: float = period_price
 
 
-# def create_membership( )
+# TODO def create_membership_type( )
+
+def mem_fetch(membership: str) -> Membership:
+    """
+    Fetch the details of a membership from DB
+    :param membership: membership id/name
+    :return: Membership Object.
+    """
+    pass
 
 class SingularEvent:
     def __init__(self, event_id, event_name, gender, sport, start_date_time, duration, capacity, enrolled=None,
@@ -87,20 +95,45 @@ class SingularEvent:
         :param user_id:
         :return:
         """
-        # TODO: BIG TODO
-
         # TODO: Get user info
         user = fetch_user(user_id)
+        tokens = user.tokenProfile  # token profile.
+        assoc_token = tokens.get(self.sport)
 
         # TODO: Membership Logic (Make membership class, put token profile as class attribute)
+        mem_tokens = 0
+        for membership in user.memberships:
+            mem = mem_fetch(membership)
+            mem_tokens += mem.profile.get(self.sport)
 
-        # TODO: Check Token Availibility
+        mem_tokens += int(not user.freePassUsed)
+        # mem_tokens no represents the number of available tokens.
+        # now we need to get the number of used tokens.
+        used_tokens = len(user.tokenProfile.get(self.sport))
 
+        capable = True
+        if used_tokens >= mem_tokens:
+            # They no longer have enough tokens for this sport, make them pay / enroll
+            capable = False
+
+        if len(self.enrolled) < self.capacity and capable:  # space available and token available.
+            self.enrolled.append(user_id)
+            # TODO: Put this enrollment (date) in the associated sport in the User and update the database.
+        elif len(self.enrolled) < self.capacity:  # space available but token unavailable.
+            self.pending.append(user_id)
+            # TODO: Figure out payment API and other necessary processes to ensure full transparency.
+            # TODO: THIS IS A BIG ONE.
+        elif capable:  # token available but no space available
+            self.waitlist.append(user_id)
+            # TODO: Tell the user that they are on the waitlist of this somehow
+        else:
+            # TODO: figure out what to do here. do we want them to pay before they go on the waitlist?
+            pass
         pass
 
 
 class User:
-    def __init__(self, user_id, first, last, email, birth, gender, freePassUsed=False, tokenProfile=None, history=None,
+    def __init__(self, user_id, first, last, email, birth, gender, freePassUsed=False, tokenProfile: dict=None, history=None,
                  scheduled=None, memberships=None, settings=None):
         self.user_id = user_id
         self.first = first
@@ -108,11 +141,12 @@ class User:
         self.email = email
         self.birth = birth
         self.gender = gender
-        self.freePassUsed = bool(freePassUsed)
-        self.tokenProfile = tokenProfile or []
+        self.freePassUsed: bool = bool(freePassUsed)
+        self.tokenProfile: dict[str, list] = tokenProfile or {}
+        # Token profile will be of structure {'sport': [date_used_1, date_used_2,...]}
         self.history = history or []
         self.scheduled = scheduled or []
-        self.memberships = memberships or []
+        self.memberships: list = memberships or []
         self.settings = settings or {}
 
     @staticmethod
