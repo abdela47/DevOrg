@@ -14,7 +14,7 @@ app = firebase_admin.initialize_app(cred)
 db = firestore.client()
 
 # indicies for token profiles: [Football, BasketBall, ]
-
+# DateTime string standard: DD-MM-YYYY;MM:HH
 
 class Membership:
     def __init__(self, mem_name, token_profile, period, period_price):
@@ -31,7 +31,22 @@ class Membership:
         self.price: float = period_price
 
 
-# TODO def create_membership_type( )
+def create_membership_type(name: str, token_profile: dict[str, int], period: str, period_price: float):
+    """
+    Create and upload a membership type up to the DB
+    :param name: DisplayName
+    :param token_profile: dictionary that sends sports name to the number of tokens allowed per period
+    :param period: either month, quarter, year or some other period.
+    :param period_price: amount to be charged per period.
+    :return: datetime (??)
+    """
+
+    new_mem_info = {"Token Profile": token_profile, "Period": period, "Period Price": period_price}
+    db.collection("Memberships").document(name).set(new_mem_info)
+
+    # TODO: Figure out History Management.
+    return 1
+
 
 def mem_fetch(membership: str) -> Membership:
     """
@@ -40,6 +55,7 @@ def mem_fetch(membership: str) -> Membership:
     :return: Membership Object.
     """
     pass
+
 
 class SingularEvent:
     def __init__(self, event_id, event_name, gender, sport, start_date_time, duration, capacity, enrolled=None,
@@ -72,7 +88,7 @@ class SingularEvent:
 
         return SingularEvent(*values)
 
-    def to_dict(self) -> list[str, dict]:
+    def to_dict(self) -> list[Union[str, dict]]:
         """
         a function to create a universal dict from self.
         :return: list with the event_id then the rest of the info in a dict.
@@ -92,40 +108,44 @@ class SingularEvent:
     def enroll_user(self, user_id) -> datetime:
         """
         Logic for enrolling user into a one time event. Figure out Queues, waitlists, capacities, buffer times...
-        :param user_id:
-        :return:
+        :param user_id: User to be enrolled into this singular event.
+        :return: Datetime potentially for logging.
         """
-        # TODO: Get user info
+        # DONE: Get user information
         user = fetch_user(user_id)
         tokens = user.tokenProfile  # token profile.
-        assoc_token = tokens.get(self.sport)
 
-        # TODO: Membership Logic (Make membership class, put token profile as class attribute)
-        mem_tokens = 0
+        # DONE: Membership Logic (Make membership class, put token profile as class attribute)
+        mem_tokens = 0  # go through the memberships and figure out how many tokens are available to the user this week
+
         for membership in user.memberships:
             mem = mem_fetch(membership)
             mem_tokens += mem.profile.get(self.sport)
 
         mem_tokens += int(not user.freePassUsed)
         # mem_tokens no represents the number of available tokens.
-        # now we need to get the number of used tokens.
+        # INFO: now we need to get the number of used tokens.
         used_tokens = len(user.tokenProfile.get(self.sport))
 
-        capable = True
+        capable = True  # Temporary boolean for whether tokens are available.
         if used_tokens >= mem_tokens:
             # They no longer have enough tokens for this sport, make them pay / enroll
             capable = False
+        # capable has been taken care of.
 
         if len(self.enrolled) < self.capacity and capable:  # space available and token available.
             self.enrolled.append(user_id)
-            # TODO: Put this enrollment (date) in the associated sport in the User and update the database.
+            # TODO: Put this enrollment (event_id) in the associated sport in the User and update the database.
+            user.scheduled.append(self.event_id)
+            # TODO: Add Date to enrolled list for user.
+            # TODO: Subtract token from sport (add it to used_tokens then update DB)
         elif len(self.enrolled) < self.capacity:  # space available but token unavailable.
             self.pending.append(user_id)
             # TODO: Figure out payment API and other necessary processes to ensure full transparency.
             # TODO: THIS IS A BIG ONE.
         elif capable:  # token available but no space available
             self.waitlist.append(user_id)
-            # TODO: Tell the user that they are on the waitlist of this somehow
+            # TODO: Tell the user that they have a waitlist item scheduled. When the event passes, waitlist scheduled doesnt go to history.
         else:
             # TODO: figure out what to do here. do we want them to pay before they go on the waitlist?
             pass
@@ -161,7 +181,7 @@ class User:
 
         # Bunch of asserts that the required dict keys exist.
         # Done: Figure out whether userId construction occurs here or whether its a necessary key. not necessary
-        # TODO: Figure out the potential keys.
+        # Done: Figure out the potential keys.
 
         mandatory_keys = ['user_id', 'first_name', 'last_name', 'email', 'birthdate', 'gender']
         all_keys = ['userId', 'first_name', 'last_name', 'email', 'birthdate', 'gender', 'free_pass_used',
@@ -296,7 +316,7 @@ def create_profile(first_name: str, last_name: str, email: str, birth: str, gend
             return False
         print(f'{user.id} => {user.to_dict()}')
 
-    # TODO: Figure out birthdate format
+    # DONE: Figure out birthdate format
     birth = birth.split('-')
     birth_dt = datetime.datetime(int(birth[2]), int(birth[1]), int(birth[0]))
     # birth_dt = birth
@@ -320,6 +340,7 @@ def fetch_user(user_id: str) -> Union[User, bool]:
     :param user_id: duh
     :return: either a User object, or False
     """
+    # DONE: fully complete.
     # users = db.collection("Users").stream()
     doc_ref = db.collection("Users").document(user_id)
     doc = doc_ref.get()
@@ -340,6 +361,7 @@ def fetch_event(event_id: str) -> Optional[SingularEvent]:
     :param event_id: duh
     :return: either an Event object, or None
     """
+    # DONE: fully complete.
     doc_ref = db.collection("Events").document(event_id)
     doc = doc_ref.get()
     if doc.exists:
@@ -376,13 +398,20 @@ def delete_event(event_id) -> datetime:
 
 
 def edit_user(user_id: str, field: str, new_value) -> datetime:
-    # TODO: Actually do it.
+    """
+    Edit at user object from database
+    :param user_id: user to edit
+    :param field: field of user to be edited. yet to be authenticated.
+    :param new_value: value to be updated.
+    :return: potentially return datetime for logging purposes.
+    """
     all_keys = ['email', 'free_pass_used', 'token_profile', 'history', 'scheduled', 'memberships', 'settings']
 
     assert field in all_keys
     user = fetch_user(user_id)
-    doc_ref = db.collection("Users").document(user_id)
-    doc_ref.update({field: new_value})
+    doc_ref = db.collection("Users").document(user_id)  # fetch user from DB
+    doc_ref.update({field: new_value})  # update direct within DB
+    # TODO: figure out history management. Logging document somewhere
 
 
 def edit_event(event_id: str, field: str, new_value) -> datetime:
