@@ -30,6 +30,20 @@ class Membership:
         self.period = period
         self.price: float = period_price
 
+    @staticmethod
+    def from_dict(data: dict):
+        """
+        Return a membership from a dictionary coming from the DB
+        :param data: the dictionary
+        :return: Membership
+        """
+        values, keys = [], ["name", "Token Profile", "Period", "Period Price"]
+
+        for key in keys:
+            values.append(data.get(key))  # TODO: figure out how to make all keys non-optional
+
+        return Membership(*values)
+
 
 def create_membership_type(name: str, token_profile: dict[str, int], period: str, period_price: float):
     """
@@ -46,15 +60,6 @@ def create_membership_type(name: str, token_profile: dict[str, int], period: str
 
     # TODO: Figure out History Management.
     return 1
-
-
-def mem_fetch(membership: str) -> Membership:
-    """
-    Fetch the details of a membership from DB
-    :param membership: membership id/name
-    :return: Membership Object.
-    """
-    pass
 
 
 class SingularEvent:
@@ -80,7 +85,7 @@ class SingularEvent:
         :param data: a dictionary wth all key filled in. All keys are mandatory
         :return: an Event Instance.
         """
-        values, keys = [], ["event_id", "gender", "sport", "start_date_time", "duration", "capacity", "enrolled",
+        values, keys = [], ["user_id", "event_id", "gender", "sport", "start_date_time", "duration", "capacity", "enrolled",
                             "tags", "pending", "waitlist"]
 
         for key in keys:
@@ -91,7 +96,7 @@ class SingularEvent:
     def to_dict(self) -> list[Union[str, dict]]:
         """
         a function to create a universal dict from self.
-        :return: list with the event_id then the rest of the info in a dict.
+        :return: list with the event_id then the rest of the infoormation in a dict.
         """
         return [self.event_id,
                 {"event_name": self.event_name,
@@ -119,7 +124,7 @@ class SingularEvent:
         mem_tokens = 0  # go through the memberships and figure out how many tokens are available to the user this week
 
         for membership in user.memberships:
-            mem = mem_fetch(membership)
+            mem = fetch_mem(membership)
             mem_tokens += mem.profile.get(self.sport)
 
         mem_tokens += int(not user.freePassUsed)
@@ -135,8 +140,12 @@ class SingularEvent:
 
         if len(self.enrolled) < self.capacity and capable:  # space available and token available.
             self.enrolled.append(user_id)
+            # TODO: Update Event DB instance with enrollment.
             # TODO: Put this enrollment (event_id) in the associated sport in the User and update the database.
-            user.scheduled.append(self.event_id)
+            new_scheduled = user.scheduled  # Get the currently scheduled events
+            new_scheduled.append(self.event_id)  # Append this new event
+            edit_user(user.user_id, "scheduled", new_scheduled)  # update the DB User with scheduled.
+
             # TODO: Add Date to enrolled list for user.
             # TODO: Subtract token from sport (add it to used_tokens then update DB)
         elif len(self.enrolled) < self.capacity:  # space available but token unavailable.
@@ -184,7 +193,7 @@ class User:
         # Done: Figure out the potential keys.
 
         mandatory_keys = ['user_id', 'first_name', 'last_name', 'email', 'birthdate', 'gender']
-        all_keys = ['userId', 'first_name', 'last_name', 'email', 'birthdate', 'gender', 'free_pass_used',
+        all_keys = ['user_id', 'first_name', 'last_name', 'email', 'birthdate', 'gender', 'free_pass_used',
                     'token_profile', 'history', 'scheduled', 'memberships', 'settings']
         values = []
         keys = set(data.keys())
@@ -199,7 +208,7 @@ class User:
 
             return User(*values)  # this will unpack the created list into the init parameters.
 
-    def to_dict(self) -> list[str, dict]:
+    def to_dict(self) -> list[Union[str, dict]]:
         """
         A function to create a universal dict from self.
         :param self: self
@@ -217,6 +226,22 @@ class User:
             "scheduled": self.scheduled,
             "memberships": self.memberships,
             "settings": self.settings}]
+
+    def get_mem(self, membership: str):
+        """
+        Get this user a membership
+        :param membership: name of memberhship
+        :return: Logging info
+        """
+        # TODO: BIG TODO Figure out payment stuff
+        self.memberships.append(membership)
+        edit_user(self.user_id, 'memberships', self.memberships)
+
+    def __str__(self):
+        thing = ""
+        for key, value in self.to_dict()[1].items():
+            thing = thing + (f'\n{key}: {value}')
+        return thing
 
 
 def hash_name(first: str, last: str) -> str:
@@ -316,7 +341,6 @@ def create_profile(first_name: str, last_name: str, email: str, birth: str, gend
             return False
         print(f'{user.id} => {user.to_dict()}')
 
-    # DONE: Figure out birthdate format
     birth = birth.split('-')
     birth_dt = datetime.datetime(int(birth[2]), int(birth[1]), int(birth[0]))
     # birth_dt = birth
@@ -370,6 +394,26 @@ def fetch_event(event_id: str) -> Optional[SingularEvent]:
         fetched['event_id'] = event_id
         event = SingularEvent.from_dict(fetched)
         return event
+    else:
+        print('DNE')
+        return None
+
+
+def fetch_mem(membership: str) -> Optional[Membership]:
+    """
+    Fetch the details of a membership from DB
+    :param membership: membership id/name
+    :return: Membership Object.
+    """
+    # DONE: fully complete
+    doc_ref = db.collection("Memberships").document(membership)
+    doc = doc_ref.get()
+    if doc.exists:
+        print(doc.to_dict())
+        fetched = doc.to_dict()
+        fetched['name'] = membership
+        mem = Membership.from_dict(fetched)
+        return mem
     else:
         print('DNE')
         return None
